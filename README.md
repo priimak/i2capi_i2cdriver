@@ -1,1 +1,1 @@
-# i2capi_i2cdriver
+# I2CAPI for I2CDriver

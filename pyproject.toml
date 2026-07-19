@@ -1,0 +1,21 @@
+[project]
+name = "i2capi-i2cdriver"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "i2cdriver==1.0.6",
+  "i2c_api @ git+https://github.com/priimak/i2c_api.git@v0.2.0"
+]
+
+[build-system]
+requires = ["setuptools", "wheel", "setuptools-git-versioning"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools-git-versioning]
+enabled = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
