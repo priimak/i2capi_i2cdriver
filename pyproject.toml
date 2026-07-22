@@ -1,12 +1,12 @@
 [project]
 name = "i2capi-i2cdriver"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
   "i2cdriver==1.0.6",
-  "i2c_api @ git+https://github.com/priimak/i2c_api.git@v0.2.0"
+  "i2c-api @ git+https://github.com/priimak/i2c_api.git@v0.2.2"
 ]
 
 [build-system]
