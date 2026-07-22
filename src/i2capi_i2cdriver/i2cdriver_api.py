@@ -42,52 +42,40 @@ class I2CMasterI2CDriver(I2CMaster):
     def write(self, address: int, data: Bits | str | int | list[int], num_bytes: int | None = None) -> bool:
         payload = self.pad_payload(self.mk_payload(data), num_bytes)
         try:
-            print(f"self.driver.start({address}, 0)")
             if not self.driver.start(address, 0):
                 return False
-            print(f"self.driver.write({payload})")
             if self.driver.write(payload.bytes):
                 return True
             else:
                 return False
         finally:
-            print("self.driver.stop()")
             self.driver.stop()
 
     def read(self, address: int, num_bytes: int = 1) -> Optional[Bits]:
         try:
-            print(f"self.driver.start({address}, 1)")
             if not self.driver.start(address, 1):
                 return None
             else:
-                print(f"self.driver.read({num_bytes})")
                 return Bits(self.driver.read(num_bytes))
         finally:
-            print("self.driver.stop()")
             self.driver.stop()
 
     def read_register(self, address: int, register: int, num_bytes: int = 1, use_restart: bool = False) \
             -> Optional[Bits]:
         try:
-            print(f"self.driver.start({address}, 0)")
             if not self.driver.start(address, 0):
                 return None
 
             payload = BitArray(f"uint:8={register}")
-            print(f"self.driver.write({payload})")
             if not self.driver.write(payload.bytes):
                 return None
             if not use_restart:
-                print("self.driver.stop()")
                 self.driver.stop()
 
-            print(f"self.driver.start({address}, 1)")
             if not self.driver.start(address, 1):
                 return None
-            print(f"self.driver.read({num_bytes})")
             return Bits(self.driver.read(num_bytes))
         finally:
-            print("self.driver.stop()")
             self.driver.stop()
 
     def write_register(self, address: int, register: int, data: Bits | str | int | list[int],

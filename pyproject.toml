@@ -1,12 +1,12 @@
 [project]
 name = "i2capi-i2cdriver"
 dynamic = ["version"]
-description = "Add your description here"
+description = "Impl of I2CAPI for I2CDriver device"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-  "i2cdriver==1.0.6",
-  "i2c-api @ git+https://github.com/priimak/i2c_api.git@v0.2.2"
+    "i2cdriver==1.0.6",
+    "i2c-api @ git+https://github.com/priimak/i2c_api.git@v0.2.2"
 ]
 
 [build-system]
@@ -18,4 +18,9 @@ enabled = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
 
