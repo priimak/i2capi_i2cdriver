@@ -1,87 +1,104 @@
 from typing import Optional
 
 from bitstring import Bits, BitArray
-from i2c_api import I2CMaster
+from i2c_api import I2CMaster, I2CLogger
+from i2c_api.log import START, I2CTransactionElement, DATA_MOSI, WRITE, ACK, NACK, STOP, READ, DATA_MISO, RESTART
 from i2cdriver import I2CDriver
 
 
+class DummyI2CLogger(I2CLogger):
+    def log_message(self, message: list[I2CTransactionElement]):
+        pass
+
 class I2CMasterI2CDriver(I2CMaster):
-    def __init__(self, driver: I2CDriver) -> None:
+    def __init__(self, driver: I2CDriver, logger: I2CLogger | None = None) -> None:
         self.driver = driver
         self._pullup_codes = ["disabled", "2.2K", "4.3K", "1.5K", "4.7K", "1.5K", "2.2K", "1.1K"]
         self._pullup_values = ["disabled", "4.7K", "4.3K", "2.2K", "1.5K", "1.1K"]
+        self.__logger = DummyI2CLogger() if logger is None else logger
 
-    def mk_payload(self, data: Bits | str | int | list[int]) -> BitArray:
-        if isinstance(data, int):
-            return BitArray(f"uint:8={data}")
-        elif isinstance(data, list):
-            acc = BitArray(0)
-            for b in data:
-                acc += BitArray(f"uint:8={b}")
-            return acc
-        elif isinstance(data, str) or isinstance(data, Bits):
-            return BitArray(data)
-        else:
-            raise RuntimeError("Invalid payload type")
-
-    def pad_payload(self, payload: BitArray, num_bytes: int | None = None) -> Bits:
-        if num_bytes is None:
-            if payload.len % 8 != 0:
-                payload.prepend(BitArray(8 - payload.len % 8))
-            else:
-                return payload
-
-        elif payload.len > num_bytes * 8:
-            payload = payload[-(num_bytes * 8):]
-
-        elif payload.len < num_bytes * 8:
-            payload.prepend(BitArray(num_bytes * 8 - payload.len))
-
-        return payload
+    def logger(self) -> I2CLogger:
+        return self.__logger
 
     def write(self, address: int, data: Bits | str | int | list[int], num_bytes: int | None = None) -> bool:
-        payload = self.pad_payload(self.mk_payload(data), num_bytes)
+        log_msg = []
+        payload = I2CMaster.pad_payload(I2CMaster.mk_payload(data), num_bytes)
         try:
+            log_msg.append(START)
+            log_msg.append(DATA_MOSI(BitArray(f"uint:7={address}")))
+            log_msg.append(WRITE)
             if not self.driver.start(address, 0):
+                log_msg.append(NACK)
                 return False
+            log_msg.append(ACK)
+            log_msg.append(DATA_MOSI(payload))
             if self.driver.write(payload.bytes):
+                log_msg.append(ACK)
                 return True
             else:
+                log_msg.append(NACK)
                 return False
         finally:
             self.driver.stop()
+            log_msg.append(STOP)
+            self.__logger.log_message(log_msg)
 
     def read(self, address: int, num_bytes: int = 1) -> Optional[Bits]:
+        log_msg = []
         try:
+            log_msg.append(START)
+            log_msg.append(DATA_MOSI(BitArray(f"uint:7={address}")))
+            log_msg.append(READ)
             if not self.driver.start(address, 1):
+                log_msg.append(NACK)
                 return None
             else:
-                return Bits(self.driver.read(num_bytes))
+                log_msg.append(ACK)
+                data_from_the_client = Bits(self.driver.read(num_bytes))
+                log_msg.append(DATA_MISO(data_from_the_client))
+                return data_from_the_client
         finally:
             self.driver.stop()
+            log_msg.append(STOP)
+            self.__logger.log_message(log_msg)
 
     def read_register(self, address: int, register: int, num_bytes: int = 1, use_restart: bool = False) \
             -> Optional[Bits]:
+        log_msg = []
         try:
+            log_msg.append(START)
+            log_msg.append(DATA_MOSI(BitArray(f"uint:7={address}")))
+            log_msg.append(WRITE)
             if not self.driver.start(address, 0):
+                log_msg.append(NACK)
                 return None
 
+            log_msg.append(ACK)
             payload = BitArray(f"uint:8={register}")
+            log_msg.append(DATA_MOSI(payload))
             if not self.driver.write(payload.bytes):
+                log_msg.append(NACK)
                 return None
+            log_msg.append(ACK)
             if not use_restart:
                 self.driver.stop()
+                log_msg.append(STOP)
+                log_msg.append(START)
+            else:
+                log_msg.append(RESTART)
 
             if not self.driver.start(address, 1):
+                log_msg.append(NACK)
                 return None
-            return Bits(self.driver.read(num_bytes))
+            else:
+                log_msg.append(ACK)
+            data_from_the_client = Bits(self.driver.read(num_bytes))
+            log_msg.append(DATA_MISO(data_from_the_client))
+            return data_from_the_client
         finally:
             self.driver.stop()
-
-    def write_register(self, address: int, register: int, data: Bits | str | int | list[int],
-                       num_bytes: int = 1) -> bool:
-        payload = BitArray(f"uint:8={register}") + self.pad_payload(self.mk_payload(data), num_bytes)
-        return self.write(address, payload)
+            log_msg.append(STOP)
+            self.__logger.log_message(log_msg)
 
     def scan(self) -> list[int]:
         return self.driver.scan(silent=True)

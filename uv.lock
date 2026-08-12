@@ -73,8 +73,8 @@ wheels = [
 
 [[package]]
 name = "i2c-api"
-version = "0.2.3.post0+git.55d2c5ff.dirty"
-source = { git = "https://github.com/priimak/i2c_api.git?rev=v0.2.3#55d2c5ff4c6d5e9efea65d684a86b550df6eecf0" }
+version = "0.4.0.post0+git.60859bac.dirty"
+source = { git = "https://github.com/priimak/i2c_api.git?rev=v0.4.0#60859bac34d343cbe24a6c83327aef60d3cc51fc" }
 dependencies = [
     { name = "bitstring" },
 ]
@@ -94,7 +94,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "i2c-api", git = "https://github.com/priimak/i2c_api.git?rev=v0.2.3" },
+    { name = "i2c-api", git = "https://github.com/priimak/i2c_api.git?rev=v0.4.0" },
     { name = "i2cdriver", specifier = "==1.0.6" },
 ]
 
