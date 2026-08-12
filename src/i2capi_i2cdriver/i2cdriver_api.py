@@ -81,7 +81,8 @@ class I2CMasterI2CDriver(I2CMaster):
         log_msg = []
         try:
             log_msg.append(I2CMessage.START)
-            log_msg.append(I2CMessage.DATA_MOSI(BitArray(f"uint:7={address}")))
+            device_address_to_log = BitArray(f"uint:7={address}")
+            log_msg.append(I2CMessage.DATA_MOSI(device_address_to_log))
             log_msg.append(I2CMessage.WRITE)
             if not self.driver.start(address, 0):
                 log_msg.append(I2CMessage.NACK)
@@ -101,6 +102,8 @@ class I2CMasterI2CDriver(I2CMaster):
             else:
                 log_msg.append(I2CMessage.RESTART)
 
+            log_msg.append(I2CMessage.DATA_MOSI(device_address_to_log))
+            log_msg.append(I2CMessage.READ)
             if not self.driver.start(address, 1):
                 log_msg.append(I2CMessage.NACK)
                 return None
