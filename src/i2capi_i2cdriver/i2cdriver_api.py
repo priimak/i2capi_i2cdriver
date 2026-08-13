@@ -72,7 +72,6 @@ class I2CMasterI2CDriver(I2CMaster):
             log_msg.append(I2CMessage.ACK)
 
             bdata = [BitArray(f"uint:8={x}") for x in payload.tobytes()]
-            bdata.reverse()
             if self.driver.write(payload.bytes):
                 for data in bdata:
                     log_msg.append(I2CMessage.DATA_MOSI(data))
@@ -123,6 +122,7 @@ class I2CMasterI2CDriver(I2CMaster):
                 log_msg.append(I2CMessage.ACK)
                 data_from_the_client = Bits(self.driver.read(num_bytes))
                 log_msg.append(I2CMessage.DATA_MISO(data_from_the_client))
+                log_msg.append(I2CMessage.ACK)
                 return data_from_the_client
         finally:
             if end_with_stop:
