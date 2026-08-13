@@ -35,31 +35,85 @@ class I2CMasterI2CDriver(I2CMaster):
         num_bytes: int | None = None,
     ) -> bool:
         log_msg = []
+        try:
+            return self.__write(
+                address,
+                data=data,
+                num_bytes=num_bytes,
+                log_msg=log_msg,
+                end_with_stop=True,
+                start_with_restart=False,
+            )
+        finally:
+            self.__logger.log_message(log_msg)
+
+    def __write(
+        self,
+        address: int,
+        *,
+        data: Bits | str | int | list[int],
+        log_msg: list[I2CTransactionElement],
+        num_bytes: int | None,
+        end_with_stop: bool,
+        start_with_restart: bool,
+    ) -> bool:
         payload = I2CMaster.pad_payload(I2CMaster.mk_payload(data), num_bytes)
         try:
-            log_msg.append(I2CMessage.START)
+            if start_with_restart:
+                log_msg.append(I2CMessage.RESTART)
+            else:
+                log_msg.append(I2CMessage.START)
+
             log_msg.append(I2CMessage.DATA_MOSI(BitArray(f"uint:7={address}")))
             log_msg.append(I2CMessage.WRITE)
             if not self.driver.start(address, 0):
                 log_msg.append(I2CMessage.NACK)
                 return False
             log_msg.append(I2CMessage.ACK)
-            log_msg.append(I2CMessage.DATA_MOSI(payload))
+
+            bdata = [BitArray(f"uint:8={x}") for x in payload.tobytes()]
+            bdata.reverse()
             if self.driver.write(payload.bytes):
-                log_msg.append(I2CMessage.ACK)
+                for data in bdata:
+                    log_msg.append(I2CMessage.DATA_MOSI(data))
+                    log_msg.append(I2CMessage.ACK)
                 return True
             else:
+                log_msg.append(I2CMessage.DATA_MOSI(bdata[0]))
                 log_msg.append(I2CMessage.NACK)
                 return False
         finally:
-            self.driver.stop()
-            log_msg.append(I2CMessage.STOP)
-            self.__logger.log_message(log_msg)
+            if end_with_stop:
+                self.driver.stop()
+                log_msg.append(I2CMessage.STOP)
 
     def read(self, address: int, num_bytes: int = 1) -> Bits | None:
         log_msg = []
         try:
-            log_msg.append(I2CMessage.START)
+            return self.__read(
+                address,
+                num_bytes=num_bytes,
+                end_with_stop=True,
+                log_msg=log_msg,
+                start_with_restart=False,
+            )
+        finally:
+            self.__logger.log_message(log_msg)
+
+    def __read(
+        self,
+        address: int,
+        *,
+        num_bytes: int,
+        log_msg: list[I2CTransactionElement],
+        end_with_stop: bool,
+        start_with_restart: bool,
+    ) -> Bits | None:
+        try:
+            if start_with_restart:
+                log_msg.append(I2CMessage.RESTART)
+            else:
+                log_msg.append(I2CMessage.START)
             log_msg.append(I2CMessage.DATA_MOSI(BitArray(f"uint:7={address}")))
             log_msg.append(I2CMessage.READ)
             if not self.driver.start(address, 1):
@@ -71,8 +125,55 @@ class I2CMasterI2CDriver(I2CMaster):
                 log_msg.append(I2CMessage.DATA_MISO(data_from_the_client))
                 return data_from_the_client
         finally:
-            self.driver.stop()
-            log_msg.append(I2CMessage.STOP)
+            if end_with_stop:
+                self.driver.stop()
+                log_msg.append(I2CMessage.STOP)
+
+    def write_register(
+        self,
+        address: int,
+        register: int,
+        data: Bits | str | int | list[int],
+        num_bytes: int | None = 1,
+        read_back: bool = False,
+        use_restart: bool = True,
+    ) -> Bits | None:
+        log_msg = []
+        try:
+            register_value = I2CMaster.pad_payload(
+                I2CMaster.mk_payload(data), num_bytes
+            )
+            value_num_bytes = int(register_value.len / 8)
+            self.__write(
+                address,
+                data=BitArray(f"uint:8={register}") + register_value,
+                log_msg=log_msg,
+                num_bytes=(value_num_bytes + 1),
+                end_with_stop=(not read_back or not use_restart),
+                start_with_restart=False,
+            )
+            if not read_back:
+                return register_value
+            else:  # read it back
+                write_success = self.__write(
+                    address,
+                    data=BitArray(f"uint:8={register}"),
+                    log_msg=log_msg,
+                    num_bytes=1,
+                    end_with_stop=(not use_restart),
+                    start_with_restart=use_restart,
+                )
+                if write_success:
+                    return self.__read(
+                        address,
+                        num_bytes=value_num_bytes,
+                        log_msg=log_msg,
+                        end_with_stop=True,
+                        start_with_restart=use_restart,
+                    )
+                else:
+                    return None
+        finally:
             self.__logger.log_message(log_msg)
 
     def read_register(
@@ -80,41 +181,25 @@ class I2CMasterI2CDriver(I2CMaster):
     ) -> Bits | None:
         log_msg = []
         try:
-            log_msg.append(I2CMessage.START)
-            device_address_to_log = BitArray(f"uint:7={address}")
-            log_msg.append(I2CMessage.DATA_MOSI(device_address_to_log))
-            log_msg.append(I2CMessage.WRITE)
-            if not self.driver.start(address, 0):
-                log_msg.append(I2CMessage.NACK)
-                return None
-
-            log_msg.append(I2CMessage.ACK)
-            payload = BitArray(f"uint:8={register}")
-            log_msg.append(I2CMessage.DATA_MOSI(payload))
-            if not self.driver.write(payload.bytes):
-                log_msg.append(I2CMessage.NACK)
-                return None
-            log_msg.append(I2CMessage.ACK)
-            if not use_restart:
-                self.driver.stop()
-                log_msg.append(I2CMessage.STOP)
-                log_msg.append(I2CMessage.START)
+            write_success = self.__write(
+                address,
+                data=BitArray(f"uint:8={register}"),
+                log_msg=log_msg,
+                num_bytes=1,
+                end_with_stop=(not use_restart),
+                start_with_restart=False,
+            )
+            if write_success:
+                return self.__read(
+                    address,
+                    num_bytes=num_bytes,
+                    log_msg=log_msg,
+                    end_with_stop=True,
+                    start_with_restart=use_restart,
+                )
             else:
-                log_msg.append(I2CMessage.RESTART)
-
-            log_msg.append(I2CMessage.DATA_MOSI(device_address_to_log))
-            log_msg.append(I2CMessage.READ)
-            if not self.driver.start(address, 1):
-                log_msg.append(I2CMessage.NACK)
                 return None
-            else:
-                log_msg.append(I2CMessage.ACK)
-            data_from_the_client = Bits(self.driver.read(num_bytes))
-            log_msg.append(I2CMessage.DATA_MISO(data_from_the_client))
-            return data_from_the_client
         finally:
-            self.driver.stop()
-            log_msg.append(I2CMessage.STOP)
             self.__logger.log_message(log_msg)
 
     def scan(self) -> list[int]:
