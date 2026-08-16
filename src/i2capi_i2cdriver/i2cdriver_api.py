@@ -1,5 +1,5 @@
 from bitstring import BitArray, Bits
-from i2c_api import I2CLogger, I2CMaster, I2CMessage
+from i2c_api import I2CLogger, I2CMaster, I2CMessage, RegisterAddress
 from i2c_api.log import I2CTransactionElement
 from i2cdriver import I2CDriver
 
@@ -132,7 +132,7 @@ class I2CMasterI2CDriver(I2CMaster):
     def write_register(
         self,
         address: int,
-        register: int,
+        register: RegisterAddress,
         data: Bits | str | int | list[int],
         num_bytes: int | None = 1,
         read_back: bool = False,
@@ -146,7 +146,10 @@ class I2CMasterI2CDriver(I2CMaster):
             value_num_bytes = int(register_value.len / 8)
             self.__write(
                 address,
-                data=BitArray(f"uint:8={register}") + register_value,
+                data=BitArray(
+                    f"uint:{8 * register.bus_width_in_bytes}={register.address}"
+                )
+                + register_value,
                 log_msg=log_msg,
                 num_bytes=(value_num_bytes + 1),
                 end_with_stop=(not read_back or not use_restart),
@@ -177,13 +180,19 @@ class I2CMasterI2CDriver(I2CMaster):
             self.__logger.log_message(log_msg)
 
     def read_register(
-        self, address: int, register: int, num_bytes: int = 1, use_restart: bool = False
+        self,
+        address: int,
+        register: RegisterAddress,
+        num_bytes: int = 1,
+        use_restart: bool = False,
     ) -> Bits | None:
         log_msg = []
         try:
             write_success = self.__write(
                 address,
-                data=BitArray(f"uint:8={register}"),
+                data=BitArray(
+                    f"uint:{8 * register.bus_width_in_bytes}={register.address}"
+                ),
                 log_msg=log_msg,
                 num_bytes=1,
                 end_with_stop=(not use_restart),
