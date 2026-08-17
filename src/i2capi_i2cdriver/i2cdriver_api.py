@@ -151,7 +151,7 @@ class I2CMasterI2CDriver(I2CMaster):
                 )
                 + register_value,
                 log_msg=log_msg,
-                num_bytes=(value_num_bytes + 1),
+                num_bytes=(value_num_bytes + register.bus_width_in_bytes),
                 end_with_stop=(not read_back or not use_restart),
                 start_with_restart=False,
             )
@@ -160,7 +160,9 @@ class I2CMasterI2CDriver(I2CMaster):
             else:  # read it back
                 write_success = self.__write(
                     address,
-                    data=BitArray(f"uint:8={register}"),
+                    data=BitArray(
+                        f"uint:{8 * register.bus_width_in_bytes}={register.address}"
+                    ),
                     log_msg=log_msg,
                     num_bytes=1,
                     end_with_stop=(not use_restart),
@@ -194,7 +196,7 @@ class I2CMasterI2CDriver(I2CMaster):
                     f"uint:{8 * register.bus_width_in_bytes}={register.address}"
                 ),
                 log_msg=log_msg,
-                num_bytes=1,
+                num_bytes=register.bus_width_in_bytes,
                 end_with_stop=(not use_restart),
                 start_with_restart=False,
             )
