@@ -121,8 +121,12 @@ class I2CMasterI2CDriver(I2CMaster):
             else:
                 log_msg.append(I2CMessage.ACK)
                 data_from_the_client = Bits(self.driver.read(num_bytes))
-                log_msg.append(I2CMessage.DATA_MISO(data_from_the_client))
-                log_msg.append(I2CMessage.ACK)
+                bdata = [
+                    BitArray(f"uint:8={x}") for x in data_from_the_client.tobytes()
+                ]
+                for data in bdata:
+                    log_msg.append(I2CMessage.DATA_MISO(data))
+                    log_msg.append(I2CMessage.ACK)
                 return data_from_the_client
         finally:
             if end_with_stop:
