@@ -1,3 +1,5 @@
+from typing import override
+
 from bitstring import BitArray, Bits
 from i2c_api import I2CLogger, I2CMaster, I2CMessage, RegisterAddress
 from i2c_api.log import I2CTransactionElement
@@ -57,7 +59,7 @@ class I2CMasterI2CDriver(I2CMaster):
         end_with_stop: bool,
         start_with_restart: bool,
     ) -> bool:
-        payload = I2CMaster.pad_payload(I2CMaster.mk_payload(data), num_bytes)
+        payload = I2CMaster.mk_payload(data, num_bytes)
         try:
             if start_with_restart:
                 log_msg.append(I2CMessage.RESTART)
@@ -133,20 +135,19 @@ class I2CMasterI2CDriver(I2CMaster):
                 self.driver.stop()
                 log_msg.append(I2CMessage.STOP)
 
+    @override
     def write_register(
         self,
         address: int,
         register: RegisterAddress,
         data: Bits | str | int | list[int],
-        num_bytes: int | None = 1,
+        num_bytes: int | None = None,
         read_back: bool = False,
         use_restart: bool = True,
     ) -> Bits | None:
         log_msg = []
         try:
-            register_value = I2CMaster.pad_payload(
-                I2CMaster.mk_payload(data), num_bytes
-            )
+            register_value = I2CMaster.mk_payload(data, num_bytes)
             value_num_bytes = int(register_value.len / 8)
             self.__write(
                 address,
