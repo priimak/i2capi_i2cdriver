@@ -1,7 +1,7 @@
 from typing import override
 
 from bitstring import BitArray, Bits
-from i2c_api import I2CLogger, I2CMaster, I2CMessage, RegisterAddress
+from i2c_api import I2CError, I2CLogger, I2CMaster, I2CMessage, RegisterAddress
 from i2c_api.log import I2CTransactionElement
 from i2cdriver import I2CDriver
 
@@ -59,6 +59,9 @@ class I2CMasterI2CDriver(I2CMaster):
         end_with_stop: bool,
         start_with_restart: bool,
     ) -> bool:
+        if address < 0:
+            raise I2CError("Invalid i2c device address")
+
         payload = I2CMaster.mk_payload(data, num_bytes)
         try:
             if start_with_restart:
@@ -110,6 +113,9 @@ class I2CMasterI2CDriver(I2CMaster):
         end_with_stop: bool,
         start_with_restart: bool,
     ) -> Bits | None:
+        if address < 0:
+            raise I2CError("Invalid i2c device address")
+
         try:
             if start_with_restart:
                 log_msg.append(I2CMessage.RESTART)
@@ -145,6 +151,9 @@ class I2CMasterI2CDriver(I2CMaster):
         read_back: bool = False,
         use_restart: bool = True,
     ) -> Bits | None:
+        if address < 0:
+            raise I2CError("Invalid i2c device address")
+
         log_msg = []
         try:
             register_value = I2CMaster.mk_payload(data, num_bytes)
@@ -193,6 +202,9 @@ class I2CMasterI2CDriver(I2CMaster):
         num_bytes: int = 1,
         use_restart: bool = False,
     ) -> Bits | None:
+        if address < 0:
+            raise I2CError("Invalid i2c device address")
+
         log_msg = []
         try:
             write_success = self.__write(
@@ -225,8 +237,11 @@ class I2CMasterI2CDriver(I2CMaster):
         return self._pullup_values
 
     def set_pullup(self, pullup_value: str) -> None:
-        code = self._pullup_codes.index(pullup_value)
-        self.driver.setpullups(code | code << 3)
+        if pullup_value in self._pullup_values:
+            code = self._pullup_codes.index(pullup_value)
+            self.driver.setpullups(code | code << 3)
+        else:
+            raise I2CError("Invalid pullup resistor value.")
 
     def get_pullup(self) -> str:
         return self._pullup_codes[self.driver.pullups & 7]
@@ -241,6 +256,6 @@ class I2CMasterI2CDriver(I2CMaster):
         if speed in self.list_clk_speeds():
             self.driver.setspeed(speed)
         else:
-            raise RuntimeError(
+            raise I2CError(
                 "Invalid clock speed value. Only 100 and 400 are allowed for this device."
             )
