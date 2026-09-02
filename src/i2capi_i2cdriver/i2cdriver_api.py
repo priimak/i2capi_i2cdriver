@@ -215,7 +215,7 @@ class I2CMasterI2CDriver(I2CMaster):
 
             return [[c.uint for c in d] for d in data_rsp], (nack == [])
         finally:
-            if stop_called != []:
+            if stop_called == []:
                 self.driver.stop()
 
     @override
