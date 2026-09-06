@@ -2,7 +2,14 @@ from functools import partial, reduce
 from typing import override
 
 from bitstring import BitArray, Bits
-from i2c_api import I2CError, I2CLogger, I2CMaster, I2CMessage, RegisterAddress
+from i2c_api import (
+    ExecResults,
+    I2CError,
+    I2CLogger,
+    I2CMaster,
+    I2CMessage,
+    RegisterAddress,
+)
 from i2c_api.commands import Address, Data, P, Read, S, Sr, W
 from i2c_api.language import I2CTransaction
 from i2c_api.log import I2CTransactionElement
@@ -145,7 +152,7 @@ class I2CMasterI2CDriver(I2CMaster):
                 log_msg.append(I2CMessage.STOP)
 
     @override
-    def _exec(self, transaction: I2CTransaction) -> tuple[list[list[BitArray]], bool]:
+    def _exec(self, transaction: I2CTransaction) -> ExecResults:
         calls = []
         data_out = []
         data_rsp = []
@@ -213,7 +220,9 @@ class I2CMasterI2CDriver(I2CMaster):
                 else:
                     break
 
-            return [[c.uint for c in d] for d in data_rsp], (nack == [])
+            return ExecResults(
+                data=[[c.uint for c in d] for d in data_rsp], is_success=(nack == [])
+            )
         finally:
             if stop_called == []:
                 self.driver.stop()
