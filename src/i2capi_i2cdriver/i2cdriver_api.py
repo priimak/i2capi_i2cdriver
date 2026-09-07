@@ -139,9 +139,7 @@ class I2CMasterI2CDriver(I2CMaster):
             else:
                 log_msg.append(I2CMessage.ACK)
                 data_from_the_client = Bits(self.driver.read(num_bytes))
-                bdata = [
-                    BitArray(f"uint:8={x}") for x in data_from_the_client.tobytes()
-                ]
+                bdata = [BitArray(f"uint:8={x}") for x in data_from_the_client.tobytes()]
                 for data in bdata:
                     log_msg.append(I2CMessage.DATA_MISO(data))
                     log_msg.append(I2CMessage.ACK)
@@ -220,9 +218,7 @@ class I2CMasterI2CDriver(I2CMaster):
                 else:
                     break
 
-            return ExecResults(
-                data=[[c.uint for c in d] for d in data_rsp], is_success=(nack == [])
-            )
+            return ExecResults(data=[[c.uint for c in d] for d in data_rsp], is_success=(nack == []))
         finally:
             if stop_called == []:
                 self.driver.stop()
@@ -246,10 +242,7 @@ class I2CMasterI2CDriver(I2CMaster):
             value_num_bytes = int(register_value.len / 8)
             self.__write(
                 address,
-                data=BitArray(
-                    f"uint:{8 * register.bus_width_in_bytes}={register.address}"
-                )
-                + register_value,
+                data=BitArray(f"uint:{8 * register.bus_width_in_bytes}={register.address}") + register_value,
                 log_msg=log_msg,
                 num_bytes=(value_num_bytes + register.bus_width_in_bytes),
                 end_with_stop=(not read_back or not use_restart),
@@ -260,9 +253,7 @@ class I2CMasterI2CDriver(I2CMaster):
             else:  # read it back
                 write_success = self.__write(
                     address,
-                    data=BitArray(
-                        f"uint:{8 * register.bus_width_in_bytes}={register.address}"
-                    ),
+                    data=BitArray(f"uint:{8 * register.bus_width_in_bytes}={register.address}"),
                     log_msg=log_msg,
                     num_bytes=1,
                     end_with_stop=(not use_restart),
@@ -295,9 +286,7 @@ class I2CMasterI2CDriver(I2CMaster):
         try:
             write_success = self.__write(
                 address,
-                data=BitArray(
-                    f"uint:{8 * register.bus_width_in_bytes}={register.address}"
-                ),
+                data=BitArray(f"uint:{8 * register.bus_width_in_bytes}={register.address}"),
                 log_msg=log_msg,
                 num_bytes=register.bus_width_in_bytes,
                 end_with_stop=(not use_restart),
@@ -342,6 +331,4 @@ class I2CMasterI2CDriver(I2CMaster):
         if speed in self.list_clk_speeds():
             self.driver.setspeed(speed)
         else:
-            raise I2CError(
-                "Invalid clock speed value. Only 100 and 400 are allowed for this device."
-            )
+            raise I2CError("Invalid clock speed value. Only 100 and 400 are allowed for this device.")
