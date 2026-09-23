@@ -8,7 +8,6 @@ from i2c_api import (
     I2CLogger,
     I2CMaster,
     I2CMessage,
-    RegisterAddress,
 )
 from i2c_api.commands import Address, Data, P, Read, S, Sr, W
 from i2c_api.language import I2CTransaction
@@ -23,6 +22,7 @@ class DummyI2CLogger(I2CLogger):
 
 class I2CMasterI2CDriver(I2CMaster):
     def __init__(self, driver: I2CDriver, logger: I2CLogger | None = None) -> None:
+        super().__init__(logger)
         self.driver = driver
         self._pullup_codes = [
             "disabled",
@@ -35,31 +35,9 @@ class I2CMasterI2CDriver(I2CMaster):
             "1.1K",
         ]
         self._pullup_values = ["disabled", "4.7K", "4.3K", "2.2K", "1.5K", "1.1K"]
-        self.__logger = DummyI2CLogger() if logger is None else logger
 
-    def logger(self) -> I2CLogger:
-        return self.__logger
-
-    def write(
-        self,
-        address: int,
-        data: Bits | str | int | list[int],
-        num_bytes: int | None = None,
-    ) -> bool:
-        log_msg = []
-        try:
-            return self.__write(
-                address,
-                data=data,
-                num_bytes=num_bytes,
-                log_msg=log_msg,
-                end_with_stop=True,
-                start_with_restart=False,
-            )
-        finally:
-            self.__logger.log_message(log_msg)
-
-    def __write(
+    @override
+    def _write(
         self,
         address: int,
         *,
@@ -101,20 +79,8 @@ class I2CMasterI2CDriver(I2CMaster):
                 self.driver.stop()
                 log_msg.append(I2CMessage.STOP)
 
-    def read(self, address: int, num_bytes: int = 1) -> Bits | None:
-        log_msg = []
-        try:
-            return self.__read(
-                address,
-                num_bytes=num_bytes,
-                end_with_stop=True,
-                log_msg=log_msg,
-                start_with_restart=False,
-            )
-        finally:
-            self.__logger.log_message(log_msg)
-
-    def __read(
+    @override
+    def _read(
         self,
         address: int,
         *,
@@ -224,93 +190,14 @@ class I2CMasterI2CDriver(I2CMaster):
                 self.driver.stop()
 
     @override
-    def write_register(
-        self,
-        address: int,
-        register: RegisterAddress,
-        data: Bits | str | int | list[int],
-        num_bytes: int | None = None,
-        read_back: bool = False,
-        use_restart: bool = True,
-    ) -> Bits | None:
-        if address < 0:
-            raise I2CError("Invalid i2c device address")
-
-        log_msg = []
-        try:
-            register_value = I2CMaster.mk_payload(data, num_bytes)
-            value_num_bytes = int(register_value.len / 8)
-            self.__write(
-                address,
-                data=BitArray(f"uint:{8 * register.bus_width_in_bytes}={register.address}") + register_value,
-                log_msg=log_msg,
-                num_bytes=(value_num_bytes + register.bus_width_in_bytes),
-                end_with_stop=(not read_back or not use_restart),
-                start_with_restart=False,
-            )
-            if not read_back:
-                return register_value
-            else:  # read it back
-                write_success = self.__write(
-                    address,
-                    data=BitArray(f"uint:{8 * register.bus_width_in_bytes}={register.address}"),
-                    log_msg=log_msg,
-                    num_bytes=1,
-                    end_with_stop=(not use_restart),
-                    start_with_restart=use_restart,
-                )
-                if write_success:
-                    return self.__read(
-                        address,
-                        num_bytes=value_num_bytes,
-                        log_msg=log_msg,
-                        end_with_stop=True,
-                        start_with_restart=use_restart,
-                    )
-                else:
-                    return None
-        finally:
-            self.__logger.log_message(log_msg)
-
-    def read_register(
-        self,
-        address: int,
-        register: RegisterAddress,
-        num_bytes: int = 1,
-        use_restart: bool = False,
-    ) -> Bits | None:
-        if address < 0:
-            raise I2CError("Invalid i2c device address")
-
-        log_msg = []
-        try:
-            write_success = self.__write(
-                address,
-                data=BitArray(f"uint:{8 * register.bus_width_in_bytes}={register.address}"),
-                log_msg=log_msg,
-                num_bytes=register.bus_width_in_bytes,
-                end_with_stop=(not use_restart),
-                start_with_restart=False,
-            )
-            if write_success:
-                return self.__read(
-                    address,
-                    num_bytes=num_bytes,
-                    log_msg=log_msg,
-                    end_with_stop=True,
-                    start_with_restart=use_restart,
-                )
-            else:
-                return None
-        finally:
-            self.__logger.log_message(log_msg)
-
     def scan(self) -> list[int]:
         return self.driver.scan(silent=True)
 
+    @override
     def list_pullups(self) -> list[str]:
         return self._pullup_values
 
+    @override
     def set_pullup(self, pullup_value: str) -> None:
         if pullup_value in self._pullup_values:
             code = self._pullup_codes.index(pullup_value)
@@ -318,15 +205,19 @@ class I2CMasterI2CDriver(I2CMaster):
         else:
             raise I2CError("Invalid pullup resistor value.")
 
+    @override
     def get_pullup(self) -> str:
         return self._pullup_codes[self.driver.pullups & 7]
 
+    @override
     def list_clk_speeds(self) -> list[int]:
         return [100, 400]
 
+    @override
     def get_clk_speed(self) -> int:
         return self.driver.speed
 
+    @override
     def set_clk_speed(self, speed: int) -> None:
         if speed in self.list_clk_speeds():
             self.driver.setspeed(speed)
